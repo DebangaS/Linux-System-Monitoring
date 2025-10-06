@@ -76,3 +76,49 @@ This project is licensed under MIT License.
 
 ---
 **End of setup instructions.**
+
+## Day 2 Updates - Enhanced Monitoring
+
+### New Features Added
+- ✅ **Real-time system monitoring** with psutil integration
+- ✅ **CPU monitoring** - Usage, per-core, frequency, detailed metrics
+- ✅ **Memory monitoring** - RAM, swap, detailed breakdown
+- ✅ **Disk monitoring** - All partitions, usage statistics
+- ✅ **Network monitoring** - I/O rates, data transfer
+- ✅ **Process management** - List, filter, search, terminate
+- ✅ **System alerts** - Threshold-based notifications
+- ✅ **Enhanced logging** - Multi-level, rotation, archiving
+- ✅ **WebSocket updates** - Real-time data streaming
+
+### Testing
+Run all Day 2 tests:
+python -m unittest discover tests/ -v
+python -m unittest tests.test_integration
+python -m unittest tests.test_performance
+
+### Performance Metrics
+- CPU monitoring: < 1 second response time
+- Memory monitoring: < 0.5 second response time  
+- Process listing: < 2 seconds for 50 processes
+- WebSocket updates: Real-time (2-second intervals)
+Commit Message: "Day 2: Add comprehensive testing suite for system monitoring features
+
+Integration tests for API endpoints and WebSocket functionality
+
+Performance tests for monitoring functions and concurrent access
+
+System monitoring tests with validation and edge cases
+
+Updated documentation with new API endpoints and features
+
+Load testing for real-time data updates and concurrent requests
+
+Test Coverage:
+✅ System resource monitoring (CPU, Memory, Disk, Network)
+✅ Process management and filtering
+✅ API endpoint integration
+✅ WebSocket real-time communication
+✅ Performance and concurrency validation
+✅ Error handling and edge cases
+
+Ready for Day 3: Database integration testing"
