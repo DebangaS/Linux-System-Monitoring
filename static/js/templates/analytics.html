@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}{{ app_name }} - Analytics & Reports{% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 20px;
+}
+.date-range-picker {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+.export-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.metric-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2><i class="fas fa-chart-area"></i> Analytics & History</h2>
+            <p>Analyze system performance trends and generate reports</p>
+        </div>
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" id="reportMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-download"></i> Generate Report
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="reportMenu">
+                <li><a class="dropdown-item" href="#">Full System Report</a></li>
+                <li><a class="dropdown-item" href="#">CPU Report</a></li>
+                <li><a class="dropdown-item" href="#">Memory Report</a></li>
+                <li><a class="dropdown-item" href="#">Performance Summary</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="date-range-picker row">
+        <div class="col-md-4">
+            <label for="startDate" class="form-label">Start Date</label>
+            <input type="datetime-local" class="form-control" id="startDate">
+        </div>
+        <div class="col-md-4">
+            <label for="endDate" class="form-label">End Date</label>
+            <input type="datetime-local" class="form-control" id="endDate">
+        </div>
+        <div class="col-md-2">
+            <label for="granularity" class="form-label">Granularity</label>
+            <select class="form-select" id="granularity">
+                <option value="1min">1 Minute</option>
+                <option value="5min" selected>5 Minutes</option>
+                <option value="15min">15 Minutes</option>
+                <option value="1hour">1 Hour</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-success w-100" onclick="loadHistoricalData()">
+                <i class="fas fa-search"></i> Load Data
+            </button>
+        </div>
+    </div>
+
+    <div id="summaryStats" class="row mt-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="metric-summary">
+                    <div>
+                        <h6>Average CPU</h6>
+                        <h3 id="avgCPU">--</h3>
+                    </div>
+                    <i class="fas fa-microchip fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="metric-summary">
+                    <div>
+                        <h6>Peak Memory</h6>
+                        <h3 id="peakMemory">--</h3>
+                    </div>
+                    <i class="fas fa-memory fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="metric-summary">
+                    <div>
+                        <h6>Data Points</h6>
+                        <h3 id="dataPoints">--</h3>
+                    </div>
+                    <i class="fas fa-database fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="metric-summary">
+                    <div>
+                        <h6>Time Range</h6>
+                        <h3 id="timeRange">--</h3>
+                    </div>
+                    <i class="fas fa-clock fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CPU Usage -->
+    <div class="chart-container">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5><i class="fas fa-microchip"></i> CPU Usage History</h5>
+            <div class="export-buttons">
+                <button class="btn btn-sm btn-outline-primary" onclick="dataExporter.exportToCSV('cpu')">
+                    <i class="fas fa-file-csv"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-success" onclick="dataExporter.exportToJSON('cpu')">
+                    <i class="fas fa-file-code"></i>
+                </button>
+            </div>
+        </div>
+        <canvas id="cpuHistoryChart"></canvas>
+    </div>
+
+    <!-- Memory Usage -->
+    <div class="chart-container">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5><i class="fas fa-memory"></i> Memory Usage History</h5>
+            <div class="export-buttons">
+                <button class="btn btn-sm btn-outline-primary" onclick="dataExporter.exportToCSV('memory')">
+                    <i class="fas fa-file-csv"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-success" onclick="dataExporter.exportToJSON('memory')">
+                    <i class="fas fa-file-code"></i>
+                </button>
+            </div>
+        </div>
+        <canvas id="memoryHistoryChart"></canvas>
+    </div>
+
+    <!-- Network I/O -->
+    <div class="chart-container">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5><i class="fas fa-network-wired"></i> Network I/O History</h5>
+            <div class="export-buttons">
+                <button class="btn btn-sm btn-outline-primary" onclick="dataExporter.exportToCSV('network')">
+                    <i class="fas fa-file-csv"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-success" onclick="dataExporter.exportToJSON('network')">
+                    <i class="fas fa-file-code"></i>
+                </button>
+            </div>
+        </div>
+        <canvas id="networkHistoryChart"></canvas>
+    </div>
+
+    <!-- Disk Usage -->
+    <div class="chart-container">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5><i class="fas fa-hdd"></i> Current Disk Usage</h5>
+            <div class="export-buttons">
+                <button class="btn btn-sm btn-outline-primary" onclick="dataExporter.exportToCSV('disk')">
+                    <i class="fas fa-file-csv"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-success" onclick="dataExporter.exportToJSON('disk')">
+                    <i class="fas fa-file-code"></i>
+                </button>
+            </div>
+        </div>
+        <canvas id="diskHistoryChart"></canvas>
+    </div>
+
+    <!-- Data Table -->
+    <div class="mt-5">
+        <h5><i class="fas fa-table"></i> Historical Data Table</h5>
+        <table class="table table-striped table-hover" id="historicalData">
+            <thead class="table-dark">
+                <tr>
+                    <th>Timestamp</th>
+                    <th>CPU (%)</th>
+                    <th>Memory (%)</th>
+                    <th>Disk (%)</th>
+                    <th>Network Sent (KB/s)</th>
+                    <th>Network Recv (KB/s)</th>
+                </tr>
+            </thead>
+            <tbody id="historicalDataBody">
+                <tr><td colspan="6" class="text-center">No data loaded</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    document.getElementById('startDate').value = yesterday.toISOString().slice(0, 16);
+    document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+});
+
+async function loadHistoricalData() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const granularity = document.getElementById('granularity').value;
+
+    if (!startDate || !endDate) {
+        alert('Please select both start and end dates');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/v1/data/historical', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                start_date: startDate,
+                end_date: endDate,
+                granularity: granularity
+            })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            displayHistoricalData(result.data);
+            updateSummaryStats(result.summary);
+        } else {
+            alert('Failed to load historical data: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error loading historical data:', error);
+        alert('Failed to load historical data');
+    }
+}
+
+function displayHistoricalData(data) {
+    if (data.cpu && data.cpu.length > 0) systemCharts.createCPUChart('cpuHistoryChart', data.cpu);
+    if (data.memory && data.memory.length > 0) systemCharts.createMemoryChart('memoryHistoryChart', data.memory);
+    if (data.network && data.network.length > 0) systemCharts.createNetworkChart('networkHistoryChart', data.network);
+    if (data.disk && data.disk.length > 0) systemCharts.createDiskChart('diskHistoryChart', data.disk);
+
+    updateDataTable(data);
+    document.getElementById('summaryStats').style.display = 'block';
+}
+
+function updateSummaryStats(summary) {
+    document.getElementById('avgCPU').textContent = summary.avg_cpu?.toFixed(1) || '--';
+    document.getElementById('peakMemory').textContent = summary.peak_memory?.toFixed(1) || '--';
+    document.getElementById('dataPoints').textContent = summary.data_points || '--';
+    document.getElementById('timeRange').textContent = summary.time_range || '--';
+}
+
+function updateDataTable(data) {
+    const tbody = document.getElementById('historicalDataBody');
+    tbody.innerHTML = '';
+
+    const timestamps = new Set();
+    ['cpu', 'memory', 'disk', 'network'].forEach(type => {
+        if (data[type]) {
+            data[type].forEach(item => timestamps.add(item.timestamp));
+        }
+    });
+
+    const combinedData = Array.from(timestamps).sort().map(timestamp => {
+        const row = { timestamp };
+        const cpu = data.cpu?.find(i => i.timestamp === timestamp);
+        const mem = data.memory?.find(i => i.timestamp === timestamp);
+        const disk = data.disk?.find(i => i.timestamp === timestamp);
+        const net = data.network?.find(i => i.timestamp === timestamp);
+        return {
+            timestamp,
+            cpu: cpu?.usage_percent ?? '--',
+            memory: mem?.usage_percent ?? '--',
+            disk: disk?.total_usage_percent ?? '--',
+            networkSent: net?.sent_rate_kbps ?? '--',
+            networkRecv: net?.recv_rate_kbps ?? '--'
+        };
+    });
+
+    combinedData.slice(-100).forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${new Date(row.timestamp).toLocaleString()}</td>
+            <td>${formatValue(row.cpu)}</td>
+            <td>${formatValue(row.memory)}</td>
+            <td>${formatValue(row.disk)}</td>
+            <td>${formatValue(row.networkSent)}</td>
+            <td>${formatValue(row.networkRecv)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function formatValue(value) {
+    return typeof value === 'number' ? value.toFixed(1) : value;
+}
+</script>
+{% endblock %}
