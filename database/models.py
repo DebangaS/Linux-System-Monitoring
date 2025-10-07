@@ -1,6 +1,6 @@
 """
 Database models and data access layer for system monitoring
-Author: Member 3 (fixed/maintained by ChatGPT)
+Author: Member 3 
 """
 from datetime import datetime, timedelta
 import sqlite3
