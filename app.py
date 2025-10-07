@@ -313,3 +313,21 @@ if __name__ == '__main__':
     # Use config debug flag if present
     debug_mode = app.config.get('DEBUG', True)
     socketio.run(app, debug=debug_mode, host='0.0.0.0', port=5000)
+
+from flask import Flask, render_template
+from api.data_routes import data_bp
+
+app = Flask(__name__)
+app.config['APP_NAME'] = "System Analytics Dashboard"
+
+@app.route('/analytics')
+def analytics():
+    """Analytics and historical data page"""
+    return render_template('analytics.html', app_name=app.config['APP_NAME'])
+
+# Register data blueprint
+app.register_blueprint(data_bp)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
