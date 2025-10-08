@@ -130,38 +130,37 @@ class TestFramework:
 
     # Fix broken lines for return and syntax errors below:
 
-# In SecurityTestSuite and similar locations:
-        results['status'] = 'passed' if results['vulnerabilities_found'] == 0 else 'failed'
-        return results
+    # In SecurityTestSuite and similar locations:
+    # results['status'] = 'passed' if results['vulnerabilities_found'] == 0 else 'failed'
+    # return results
 
-# Same fix for test_api_authentication, test_input_validation, test_file_permissions:
-        results['status'] = 'passed' if results['vulnerabilities_found'] == 0 else 'failed'
-        return results
+    # Same fix for test_api_authentication, test_input_validation, test_file_permissions:
+    # results['status'] = 'passed' if results['vulnerabilities_found'] == 0 else 'failed'
+    # return results
 
-# In test_browser_compatibility:
-        results['status'] = 'passed' if results['compatibility_issues'] == 0 else 'needs_review'
-        return results
+    # In test_browser_compatibility:
+    # results['status'] = 'passed' if results['compatibility_issues'] == 0 else 'needs_review'
+    # return results
 
-# In test_javascript_errors:
-        results = {
-            'test_name': 'JavaScript Error Detection',
-            'errors_found': len([e for e in simulated_errors if e['type'] == 'error']),
-            'warnings_found': len([e for e in simulated_errors if e['type'] == 'warning']),
-            'details': simulated_errors
-        }
-        results['status'] = 'passed' if results['errors_found'] == 0 else 'failed'
-        return results
+    # In test_javascript_errors:
+    # results = {
+    #     'test_name': 'JavaScript Error Detection',
+    #     'errors_found': len([e for e in simulated_errors if e['type'] == 'error']),
+    #     'warnings_found': len([e for e in simulated_errors if e['type'] == 'warning']),
+    #     'details': simulated_errors
+    # }
+    # results['status'] = 'passed' if results['errors_found'] == 0 else 'failed'
+    # return results
 
-# In IntegrationTestSuite test_end_to_end_monitoring_flow:
-        results['success_rate'] = (results['steps_completed'] / results['total_steps']) * 100
-        results['status'] = 'passed' if results['steps_completed'] == results['total_steps'] else 'partial'
-        return results
+    # In IntegrationTestSuite test_end_to_end_monitoring_flow:
+    # results['success_rate'] = (results['steps_completed'] / results['total_steps']) * 100
+    # results['status'] = 'passed' if results['steps_completed'] == results['total_steps'] else 'partial'
+    # return results
 
-# In IntegrationTestSuite test_database_analytics_integration:
-        results['success_rate'] = (results['operations_successful'] / results['operations_tested']) * 100 if results['operations_tested'] else 0
-        results['status'] = 'passed' if results['operations_successful'] == results['operations_tested'] else 'partial'
-        return results
+    # In IntegrationTestSuite test_database_analytics_integration:
+    # results['success_rate'] = (results['operations_successful'] / results['operations_tested']) * 100 if results['operations_tested'] else 0
+    # results['status'] = 'passed' if results['operations_successful'] == results['operations_tested'] else 'partial'
+    # return results
 
-# In test_concurrent_operations:
-                'tasks_per_second': thread_count / execution_time if execution_time > 0 else 0
-
+    # In test_concurrent_operations:
+    #     'tasks_per_second': thread_count / execution_time if execution_time > 0 else 0
