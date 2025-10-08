@@ -875,3 +875,67 @@ def get_analytics_engine(db_manager):
     if analytics_engine is None:
         analytics_engine = AdvancedAnalyticsEngine(db_manager)
     return analytics_engine
+
+"""
+Advanced Data Analytics Engine
+Author: Member 3 
+"""
+# ... (all your existing imports and code) ...
+
+# Add this at the end of your file:
+
+class DataAnalyzer:
+    """Interface for analytics engine used by tests"""
+
+    def __init__(self, db_path):
+        # Import your DatabaseManager here or at the top if not already imported
+        from database.models import DatabaseManager
+        self.db_manager = DatabaseManager(db_path=db_path)
+        self.engine = get_analytics_engine(self.db_manager)
+
+    def get_cpu_trends(self, hours=24):
+        """Returns CPU stats (average, min, max, samples) for last N hours"""
+        analysis = self.engine.analyze_metric_comprehensive('cpu', hours=hours)
+        if 'error' in analysis:
+            return analysis
+        stats = analysis.get('descriptive_stats', {})
+        return {
+            'average': stats.get('mean'),
+            'minimum': stats.get('min'),
+            'maximum': stats.get('max'),
+            'samples': stats.get('count')
+        }
+
+    def get_memory_trends(self, hours=24):
+        """Returns memory stats (average, min, max, samples) for last N hours"""
+        memory_analysis = self.engine.analyze_metric_comprehensive('memory', hours=hours)
+        if 'error' in memory_analysis:
+            return memory_analysis
+        stats = memory_analysis.get('descriptive_stats', {})
+        swap_stats = self.engine.analyze_metric_comprehensive('swap', hours=hours).get('descriptive_stats', {})
+        return {
+            'memory': {
+                'average': stats.get('mean'),
+                'minimum': stats.get('min'),
+                'maximum': stats.get('max')
+            },
+            'swap': {
+                'average': swap_stats.get('mean'),
+                'minimum': swap_stats.get('min'),
+                'maximum': swap_stats.get('max')
+            },
+            'samples': stats.get('count')
+        }
+
+    def generate_report(self, hours=24):
+        """Generates report for last N hours"""
+        report = {
+            'report_generated': True,
+            'cpu_analysis': self.get_cpu_trends(hours),
+            'memory_analysis': self.get_memory_trends(hours),
+            'disk_analysis': self.engine.analyze_metric_comprehensive('disk', hours=hours),
+            'network_analysis': self.engine.analyze_metric_comprehensive('network', hours=hours)
+        }
+        return report
+
+# (You may want to move this code to a new file called `data_analyzer.py` if it isn't already!)
