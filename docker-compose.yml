@@ -1,0 +1,65 @@
+# ==============================================
+# Docker Compose configuration for System Monitor
+# Author: Member 1
+# ==============================================
+
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: sysmonitor-web
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key}
+      DATABASE_URL: sqlite:///data/production.db
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: INFO
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - sysmonitor-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sysmonitor-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - sysmonitor-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: sysmonitor-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./static:/var/www/static
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - sysmonitor-network
+
+# ==============================================
+# Volumes & Networks
+# ==============================================
+volumes:
+  redis_data:
+
+networks:
+  sysmonitor-network:
+    driver: bridge
