@@ -116,7 +116,7 @@ class TestDay2Integration:
         time.sleep(1)
 
         # Test that scheduler is running
-        assert scheduler.running
+        assert getattr(scheduler, "running", False)
 
         # Shutdown scheduler
         scheduler.shutdown()
