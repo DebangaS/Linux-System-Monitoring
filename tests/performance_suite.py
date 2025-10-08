@@ -159,7 +159,7 @@ class LoadTestRunner:
             metric = self.make_request(session, user_id, endpoint)
             # Add scenario context
             if metric:
-                metric.scenario = scenario_name
+                setattr(metric, 'scenario', scenario_name)
             # Wait before next step
             if self.test_stop_flag.wait(timeout=think_time):
                 break
