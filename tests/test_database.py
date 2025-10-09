@@ -265,10 +265,10 @@ class TestDataAnalyzer(unittest.TestCase):
                 'timestamp': timestamp
             }
             network_data = {
-                'bytes_sent': random.randint(1e7, 1e9),
-                'bytes_recv': random.randint(1e7, 1e9),
-                'packets_sent': random.randint(1e3, 1e5),
-                'packets_recv': random.randint(1e3, 1e5),
+                'bytes_sent': random.randint(int(1e7), int(1e9)),
+                'bytes_recv': random.randint(int(1e7), int(1e9)),
+                'packets_sent': random.randint(int(1e3), int(1e5)),
+                'packets_recv': random.randint(int(1e3), int(1e5)),
                 'sent_rate_kbps': random.uniform(100, 1000),
                 'recv_rate_kbps': random.uniform(200, 2000),
                 'timestamp': timestamp

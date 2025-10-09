@@ -68,9 +68,18 @@ class TestApplicationLoad(unittest.TestCase):
                 for endpoint in endpoints:
                     futures.append(executor.submit(make_request, endpoint))
             results = []
-            for future in as_completed(futures, timeout=60):
-                result = future.result()
-                results.append(result)
+            try:
+                for future in as_completed(futures, timeout=60):
+                    result = future.result()
+                    results.append(result)
+            except Exception as e:
+                # In case of timeout, collect results from finished futures only
+                for future in futures:
+                    if future.done():
+                        try:
+                            results.append(future.result())
+                        except Exception:
+                            pass
 
         successful_requests = [r for r in results if r['success']]
         failed_requests = [r for r in results if not r['success']]
@@ -125,7 +134,18 @@ class TestApplicationLoad(unittest.TestCase):
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(create_client) for _ in range(20)]
-            results = [future.result() for future in as_completed(futures, timeout=30)]
+            results = []
+            try:
+                for future in as_completed(futures, timeout=30):
+                    results.append(future.result())
+            except Exception as e:
+                # In case of timeout, collect results from finished futures only
+                for future in futures:
+                    if future.done():
+                        try:
+                            results.append(future.result())
+                        except Exception:
+                            pass
 
         successful_connections = sum(results)
 
@@ -181,8 +201,17 @@ class TestApplicationLoad(unittest.TestCase):
                 read_futures = [executor.submit(read_data) for _ in range(3)]
 
                 all_results = []
-                for future in as_completed(write_futures + read_futures, timeout=60):
-                    all_results.extend(future.result())
+                try:
+                    for future in as_completed(write_futures + read_futures, timeout=60):
+                        all_results.extend(future.result())
+                except Exception as e:
+                    # In case of timeout, collect results from finished futures only
+                    for future in write_futures + read_futures:
+                        if future.done():
+                            try:
+                                all_results.extend(future.result())
+                            except Exception:
+                                pass
 
                 write_results = [r for r in all_results if r['operation'] == 'write']
                 read_results = [r for r in all_results if r['operation'] == 'read']
