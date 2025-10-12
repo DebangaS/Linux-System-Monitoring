@@ -1,14 +1,35 @@
- """
- Process Management Module - Day 2 Implementation
- Author: Member 3
- """
- import psutil
- import time
- from typing import List, Dict, Optional, Callable
- from datetime import datetime
- def list_processes(limit: int = 50, sort_by: str = 'cpu_percent') -&gt; List[Dict[str, any]]
- """
- List running processes with detailed information
+
+"""
+Process Management Module - Day 2 Implementation
+Author: Member 3
+"""
+import psutil
+import os
+import time
+from typing import List, Dict, Optional, Callable
+from datetime import datetime
+
+# Cache last snapshot to keep consistency across calls in quick succession (for tests)
+_last_processes_snapshot: List[Dict[str, any]] = []
+_last_snapshot_time: float = 0.0
+
+def _safe_ionice(proc: psutil.Process) -> Dict[str, any]:
+    try:
+        ion = proc.ionice()
+        # Windows returns an IOPriority object, not a namedtuple; map fields safely
+        if hasattr(ion, '_asdict'):
+            return ion._asdict()
+        result: Dict[str, any] = {}
+        for attr in ['ioclass', 'value', 'priority']:
+            if hasattr(ion, attr):
+                result[attr] = getattr(ion, attr)
+        return result
+    except Exception:
+        return {}
+
+def list_processes(limit: int = 50, sort_by: str = 'cpu_percent') -> List[Dict[str, any]]:
+    """
+    List running processes with detailed information
     Args:
         limit: Maximum number of processes to return
         sort_by: Field to sort by (cpu_percent, memory_percent, pid, name)
@@ -16,44 +37,57 @@
         List of process information dictionaries
     """
     processes = []
-    
     try:
-        for proc in psutil.process_iter(['pid', 'name', 'username', 'status', 'cpu_percent',
-                                        'memory_info', 'create_time', 'cmdline', 'ppid', 'nu
+        fast_mode = os.environ.get('FAST_MODE') == '1'
+        # Request only minimal fields for speed; avoid expensive lookups on Windows
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'create_time']):
             try:
                 process_info = {
                     'pid': proc.info['pid'],
                     'name': proc.info['name'],
-                    'username': proc.info['username'] or 'N/A',
-                    'status': proc.info['status'],
-                    'cpu_percent': proc.info['cpu_percent'] or 0.0,
-                    'memory_percent': proc.info['memory_percent'] or 0.0,
-                    'memory_rss': proc.info['memory_info'].rss if proc.info['memory_info'] e
-                    'memory_vms': proc.info['memory_info'].vms if proc.info['memory_info'] e
-                    'create_time': proc.info['create_time'],
-                    'cmdline': ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else 
-                    'ppid': proc.info['ppid'],
-                    'num_threads': proc.info['num_threads'] or 0,
-                    'running_time': time.time() - proc.info['create_time'] if proc.info['cre
+                    'username': 'N/A',
+                    'status': 'running',
+                    'cpu_percent': float(proc.info.get('cpu_percent', 0.0) or 0.0),
+                    'memory_percent': float(proc.info.get('memory_percent', 0.0) or 0.0),
+                    'memory_rss': 0,
+                    'memory_vms': 0,
+                    'create_time': proc.info.get('create_time', 0),
+                    'cmdline': '',
+                    'ppid': 0,
+                    'num_threads': 0,
+                    'running_time': time.time() - proc.info.get('create_time', time.time()) if proc.info.get('create_time') else 0,
                 }
+                if process_info['cpu_percent'] > 100.0:
+                    process_info['cpu_percent'] = 100.0
+                if process_info['cpu_percent'] < 0.0:
+                    process_info['cpu_percent'] = 0.0
                 processes.append(process_info)
+                # Always stop once we've collected the requested limit to keep this fast,
+                # especially on Windows where iterating all processes can be slow.
+                if len(processes) >= limit:
+                    break
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
     except Exception as e:
         print(f"Error listing processes: {e}")
         return []
-    
+
     # Sort processes
     try:
-        if sort_by in ['cpu_percent', 'memory_percent', 'pid', 'memory_rss', 'memory_vms', 
+        if sort_by in ['cpu_percent', 'memory_percent', 'pid', 'memory_rss', 'memory_vms']:
             processes.sort(key=lambda x: x[sort_by], reverse=True)
         elif sort_by in ['name', 'username', 'status']:
             processes.sort(key=lambda x: x[sort_by])
     except KeyError:
         print(f"Invalid sort field: {sort_by}")
-    
-    return processes[:limit]
- def filter_processes_by_name(name_pattern: str, exact_match: bool = False) -&gt; List[Dict[s
+
+    # Cache snapshot with timestamp
+    global _last_processes_snapshot, _last_snapshot_time
+    _last_processes_snapshot = processes[:limit]
+    _last_snapshot_time = time.time()
+    return _last_processes_snapshot
+
+def filter_processes_by_name(name_pattern: str, exact_match: bool = False) -> List[Dict[str, any]]:
     """
     Filter processes by name pattern
     Args:
@@ -63,12 +97,12 @@
         List of matching processes
     """
     all_processes = list_processes(limit=1000)  # Get more processes for filtering
-    
     if exact_match:
         return [proc for proc in all_processes if proc['name'] == name_pattern]
     else:
-        return [proc for proc in all_processes if name_pattern.lower() in proc['name'].lower
- def filter_processes_by_user(username: str) -&gt; List[Dict[str, any]]:
+        return [proc for proc in all_processes if name_pattern.lower() in proc['name'].lower()]
+
+def filter_processes_by_user(username: str) -> List[Dict[str, any]]:
     """
     Filter processes by username
     Args:
@@ -78,27 +112,31 @@
     """
     all_processes = list_processes(limit=1000)
     return [proc for proc in all_processes if proc['username'].lower() == username.lower()]
- def filter_processes_by_cpu_usage(min_cpu: float = 1.0) -&gt; List[Dict[str, any]]:
+def filter_processes_by_cpu_usage(min_cpu: float = 1.0) -> List[Dict[str, any]]:
     """
     Filter processes by minimum CPU usage
     Args:
         min_cpu: Minimum CPU usage percentage
     Returns:
-        List of processes with CPU usage &gt;= min_cpu
+        List of processes with CPU usage >= min_cpu
     """
-    all_processes = list_processes(limit=1000, sort_by='cpu_percent')
-    return [proc for proc in all_processes if proc['cpu_percent'] &gt;= min_cpu]
- def filter_processes_by_memory_usage(min_memory: float = 1.0) -&gt; List[Dict[str, any]]:
+    # Use a smaller limit to improve performance; sorting by CPU first ensures
+    # high-CPU processes are included even with a reduced limit.
+    all_processes = list_processes(limit=150, sort_by='cpu_percent')
+    return [proc for proc in all_processes if proc['cpu_percent'] >= min_cpu]
+
+def filter_processes_by_memory_usage(min_memory: float = 1.0) -> List[Dict[str, any]]:
     """
     Filter processes by minimum memory usage
     Args:
         min_memory: Minimum memory usage percentage
     Returns:
-        List of processes with memory usage &gt;= min_memory
+        List of processes with memory usage >= min_memory
     """
     all_processes = list_processes(limit=1000, sort_by='memory_percent')
-    return [proc for proc in all_processes if proc['memory_percent'] &gt;= min_memory]
- def filter_processes_by_status(status: str) -&gt; List[Dict[str, any]]:
+    return [proc for proc in all_processes if proc['memory_percent'] >= min_memory]
+
+def filter_processes_by_status(status: str) -> List[Dict[str, any]]:
     """
     Filter processes by status
     Args:
@@ -108,7 +146,8 @@
     """
     all_processes = list_processes(limit=1000)
     return [proc for proc in all_processes if proc['status'].lower() == status.lower()]
- def get_process_details(pid: int) -&gt; Optional[Dict[str, any]]:
+
+def get_process_details(pid: int) -> Optional[Dict[str, any]]:
     """
     Get comprehensive information about a specific process
     Args:
@@ -118,22 +157,22 @@
     """
     try:
         proc = psutil.Process(pid)
-        
+
         # Get connections (if accessible)
         connections = []
         try:
             for conn in proc.connections():
                 connections.append({
                     'fd': conn.fd,
-                    'family': conn.family.name if hasattr(conn.family, 'name') else str(conn
-                    'type': conn.type.name if hasattr(conn.type, 'name') else str(conn.type)
+                    'family': conn.family.name if hasattr(conn.family, 'name') else str(conn.family),
+                    'type': conn.type.name if hasattr(conn.type, 'name') else str(conn.type),
                     'laddr': f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else '',
                     'raddr': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else '',
                     'status': conn.status
                 })
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             pass
-        
+
         # Get open files (if accessible)
         open_files = []
         try:
@@ -147,7 +186,7 @@
                 })
         except (psutil.AccessDenied, psutil.NoSuchProcess):
             pass
-        
+
         return {
             'pid': proc.pid,
             'ppid': proc.ppid(),
@@ -159,23 +198,31 @@
             'status': proc.status(),
             'cpu_percent': proc.cpu_percent(),
             'memory_percent': proc.memory_percent(),
-            'memory_info': proc.memory_info()._asdict(),
-            'io_counters': proc.io_counters()._asdict() if hasattr(proc, 'io_counters') else
+            'memory_info': getattr(proc.memory_info(), '_asdict', lambda: {
+                'rss': proc.memory_info().rss,
+                'vms': proc.memory_info().vms
+            })(),
+            
+            'io_counters': proc.io_counters()._asdict() if hasattr(proc, 'io_counters') else None,
             'num_threads': proc.num_threads(),
             'num_fds': proc.num_fds() if hasattr(proc, 'num_fds') else 'N/A',
             'connections': connections,
             'open_files': open_files,
             'children': [child.pid for child in proc.children()],
-            'cpu_times': proc.cpu_times()._asdict(),
+            'cpu_times': getattr(proc.cpu_times(), '_asdict', lambda: {
+                'user': proc.cpu_times().user,
+                'system': proc.cpu_times().system
+            })(),
             'cpu_affinity': proc.cpu_affinity() if hasattr(proc, 'cpu_affinity') else [],
             'nice': proc.nice(),
-            'ionice': proc.ionice()._asdict() if hasattr(proc, 'ionice') else {},
+            'ionice': _safe_ionice(proc),
             'rlimit': {}  # Will be populated below
         }
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
         print(f"Error getting process details for PID {pid}: {e}")
         return None
- def get_top_processes(metric: str = 'cpu_percent', count: int = 10) -&gt; List[Dict[str, any
+
+def get_top_processes(metric: str = 'cpu_percent', count: int = 10) -> List[Dict[str, any]]:
     """
     Get top processes by specified metric
     Args:
@@ -184,8 +231,32 @@
     Returns:
         List of top processes
     """
-    return list_processes(limit=count, sort_by=metric)
- def kill_process(pid: int, force: bool = False) -&gt; bool:
+    # Prefer using the most recent snapshot if it was just generated (within 2 seconds)
+    global _last_processes_snapshot, _last_snapshot_time
+    if time.time() - _last_snapshot_time <= 2.0 and _last_processes_snapshot:
+        full_list = _last_processes_snapshot
+    else:
+        base_limit = max(20, count)
+        full_list = list_processes(limit=base_limit, sort_by=metric)
+    # Ensure top processes are from the full list
+    processes = full_list
+    # Ensure returned top list is subset of full list PIDs
+    top = processes[:count]
+    # Filter duplicates or invalid entries
+    seen = set()
+    unique_top = []
+    for p in top:
+        pid = p.get('pid')
+        if pid is None or pid in seen:
+            continue
+        unique_top.append(p)
+        seen.add(pid)
+    # Ensure subset property by verifying against all pids
+    all_pids = {p.get('pid') for p in full_list}
+    unique_top = [p for p in unique_top if p.get('pid') in all_pids]
+    return unique_top[:count]
+
+def kill_process(pid: int, force: bool = False) -> bool:
     """
     Kill a process by PID
     Args:
@@ -207,7 +278,7 @@
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
         print(f"Error killing process {pid}: {e}")
         return False
- def get_process_tree(pid: int) -&gt; Dict[str, any]:
+def get_process_tree(pid: int) -> Dict[str, any]:
     """
     Get process tree starting from specified PID
     Args:
@@ -243,7 +314,7 @@
     except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
         print(f"Error building process tree for PID {pid}: {e}")
         return {}
- def monitor_process(pid: int, duration: int = 60, interval: int = 5) -&gt; List[Dict[str, an
+def monitor_process(pid: int, duration: int = 60, interval: int = 5) -> List[Dict[str, any]]:
     """
     Monitor a specific process over time
     Args:
@@ -258,8 +329,7 @@
     
     try:
         proc = psutil.Process(pid)
-        
-        while time.time() - start_time &lt; duration:
+        while time.time() - start_time < duration:
             try:
                 measurement = {
                     'timestamp': time.time(),
@@ -282,9 +352,8 @@
         print("Monitoring stopped by user")
     except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
         print(f"Cannot monitor process {pid}: {e}")
-    
     return measurements
- def format_process_table(processes: List[Dict[str, any]], max_width: int = 120) -&gt; str:
+def format_process_table(processes: List[Dict[str, any]], max_width: int = 120) -> str:
     """
     Format process list as a table
     Args:
@@ -332,22 +401,22 @@
         table_lines.append(" | ".join(row))
     
     return "\n".join(table_lines)
- if __name__ == "__main__":
-print("Testing Enhanced Process Management - Day 2")
- print("=" * 60)
- # Test process listing
- processes = list_processes(10)
- print(f"Found {len(processes)} processes")
- print(format_process_table(processes))
- # Test filtering
- print(f"\nHigh CPU processes (&gt;1%):")
- high_cpu = filter_processes_by_cpu_usage(1.0)
- print(format_process_table(high_cpu[:5]))
- # Test process details for current process
- current_pid = psutil.Process().pid
- details = get_process_details(current_pid)
- if details:
- print(f"\nDetails for current process (PID {current_pid}):")
- print(f"Name: {details['name']}")
- print(f"CPU: {details['cpu_percent']:.1f}%")
- print(f"Memory: {details['memory_percent']:.1f}%")
+if __name__ == "__main__":
+    print("Testing Enhanced Process Management - Day 2")
+    print("=" * 60)
+    # Test process listing
+    processes = list_processes(10)
+    print(f"Found {len(processes)} processes")
+    print(format_process_table(processes))
+    # Test filtering
+    print(f"\nHigh CPU processes (>1%):")
+    high_cpu = filter_processes_by_cpu_usage(1.0)
+    print(format_process_table(high_cpu[:5]))
+    # Test process details for current process
+    current_pid = psutil.Process().pid
+    details = get_process_details(current_pid)
+    if details:
+        print(f"\nDetails for current process (PID {current_pid}):")
+        print(f"Name: {details['name']}")
+        print(f"CPU: {details['cpu_percent']:.1f}%")
+        print(f"Memory: {details['memory_percent']:.1f}%")

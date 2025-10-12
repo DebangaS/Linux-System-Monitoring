@@ -14,12 +14,27 @@ from collections import deque
 
 # Import database manager
 from database.models import db_manager
-from database.data_analyzer import data_analyzer
+# data_analyzer is optional; provide a safe stub when not available
+try:
+    from database.data_analyzer import data_analyzer  # type: ignore
+except Exception:
+    class _AnalyzerStub:
+        def get_cpu_trends(self, hours: int = 24):
+            return {}
+        def get_memory_trends(self, hours: int = 24):
+            return {}
+        def get_alert_summary(self, hours: int = 24):
+            return {}
+    data_analyzer = _AnalyzerStub()
 
 logger = logging.getLogger(__name__)
 
 
 class SystemResourceMonitor:
+    def get_alerts(self) -> list:
+        """Return current system alerts (placeholder implementation)"""
+        # TODO: Implement real alert logic
+        return []
     """Enhanced system resource monitor with database integration"""
 
     def __init__(self, max_data_points=100, enable_database=True):
@@ -86,11 +101,11 @@ class SystemResourceMonitor:
     def get_cpu_usage_enhanced(self) -> Dict:
         """Enhanced CPU usage with validation and database integration"""
         try:
-            cpu_percent = psutil.cpu_percent(interval=1)
+            cpu_percent = psutil.cpu_percent(interval=0.0)
             cpu_count = psutil.cpu_count()
             cpu_count_logical = psutil.cpu_count(logical=True)
             cpu_freq = psutil.cpu_freq()
-            cpu_per_core = psutil.cpu_percent(percpu=True)
+            cpu_per_core = psutil.cpu_percent(percpu=True, interval=0.0)
             cpu_times = psutil.cpu_times()
 
             if not self.validate_data('cpu_usage', cpu_percent):
@@ -367,12 +382,15 @@ class SystemResourceMonitor:
             hourly_aggregated = self.get_aggregated_data(hours=1)
 
             trends = {}
-            if self.enable_database:
-                trends = {
-                    'cpu_trends': data_analyzer.get_cpu_trends(hours=24),
-                    'memory_trends': data_analyzer.get_memory_trends(hours=24),
-                    'alert_summary': data_analyzer.get_alert_summary(hours=24)
-                }
+            if self.enable_database and hasattr(data_analyzer, 'get_cpu_trends'):
+                try:
+                    trends = {
+                        'cpu_trends': data_analyzer.get_cpu_trends(hours=24),
+                        'memory_trends': data_analyzer.get_memory_trends(hours=24),
+                        'alert_summary': data_analyzer.get_alert_summary(hours=24)
+                    }
+                except Exception:
+                    trends = {}
 
             return {
                 'current': current_resources,

@@ -888,7 +888,7 @@ class DataAnalyzer:
     """Interface for analytics engine used by tests"""
 
     def __init__(self, db_path):
-        # Import your DatabaseManager here or at the top if not already imported
+        # Import here to avoid heavy imports at module load in test contexts
         from database.models import DatabaseManager
         self.db_manager = DatabaseManager(db_path=db_path)
         self.engine = get_analytics_engine(self.db_manager)

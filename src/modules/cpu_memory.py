@@ -9,7 +9,7 @@ import platform
 from typing import Dict, List, Any
 
 
-def get_cpu_usage(interval: float = 1.0) -> float:
+def get_cpu_usage(interval: float = 0.1) -> float:
     """
     Get current CPU usage percentage with specified interval.
     Args:
