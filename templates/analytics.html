@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }} - Analytics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-tachometer-alt"></i> {{ app_name }}
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a class="nav-link" href="{{ url_for('history') }}">History</a>
+                <a class="nav-link active" href="{{ url_for('analytics') }}">Analytics</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2><i class="fas fa-chart-pie"></i> System Analytics</h2>
+                <p class="text-muted">Advanced analytics and insights</p>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-microchip fa-2x text-primary mb-2"></i>
+                        <h5 class="card-title">CPU Health</h5>
+                        <h3 class="text-success" id="cpuHealth">Good</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-memory fa-2x text-info mb-2"></i>
+                        <h5 class="card-title">Memory Health</h5>
+                        <h3 class="text-success" id="memoryHealth">Good</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-hdd fa-2x text-warning mb-2"></i>
+                        <h5 class="card-title">Disk Health</h5>
+                        <h3 class="text-success" id="diskHealth">Good</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-network-wired fa-2x text-success mb-2"></i>
+                        <h5 class="card-title">Network Health</h5>
+                        <h3 class="text-success" id="networkHealth">Good</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Resource Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="distributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-bar"></i> Performance Trends
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list"></i> Top Processes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Process Name</th>
+                                        <th>PID</th>
+                                        <th>CPU %</th>
+                                        <th>Memory %</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="processTable">
+                                    <tr>
+                                        <td colspan="5" class="text-center">Loading...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle"></i> System Alerts
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="alertsContainer">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                <p>No active alerts</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let distributionChart, trendsChart;
+
+        // Initialize charts
+        function initCharts() {
+            // Distribution Chart (Pie)
+            const distributionCtx = document.getElementById('distributionChart').getContext('2d');
+            distributionChart = new Chart(distributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['CPU', 'Memory', 'Disk', 'Available'],
+                    datasets: [{
+                        data: [25, 35, 20, 20],
+                        backgroundColor: [
+                            '#1976d2',
+                            '#7b1fa2',
+                            '#388e3c',
+                            '#f5f5f5'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Trends Chart (Bar)
+            const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+            trendsChart = new Chart(trendsCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['CPU', 'Memory', 'Disk', 'Network'],
+                    datasets: [{
+                        label: 'Average Usage (%)',
+                        data: [45, 62, 35, 28],
+                        backgroundColor: [
+                            'rgba(25, 118, 210, 0.8)',
+                            'rgba(123, 31, 162, 0.8)',
+                            'rgba(56, 142, 60, 0.8)',
+                            'rgba(245, 124, 0, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load system analytics
+        async function loadAnalytics() {
+            try {
+                // Load system status
+                const statusResponse = await fetch('/api/status');
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    updateSystemHealth(statusData);
+                }
+
+                // Load current system resources
+                const resourcesResponse = await fetch('/api/v1/system/resources');
+                if (resourcesResponse.ok) {
+                    const resourcesData = await resourcesResponse.json();
+                    updateCharts(resourcesData.data);
+                }
+
+                // Load processes
+                const processesResponse = await fetch('/api/v1/system/processes');
+                if (processesResponse.ok) {
+                    const processesData = await processesResponse.json();
+                    updateProcessTable(processesData.data);
+                }
+
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        // Update system health indicators
+        function updateSystemHealth(data) {
+            // Simple health logic based on database connection and monitoring status
+            const isHealthy = data.monitoring_active && (data.database?.connected !== false);
+            const healthStatus = isHealthy ? 'Good' : 'Warning';
+            const healthClass = isHealthy ? 'text-success' : 'text-warning';
+
+            document.getElementById('cpuHealth').textContent = healthStatus;
+            document.getElementById('cpuHealth').className = healthClass;
+            
+            document.getElementById('memoryHealth').textContent = healthStatus;
+            document.getElementById('memoryHealth').className = healthClass;
+            
+            document.getElementById('diskHealth').textContent = healthStatus;
+            document.getElementById('diskHealth').className = healthClass;
+            
+            document.getElementById('networkHealth').textContent = healthStatus;
+            document.getElementById('networkHealth').className = healthClass;
+        }
+
+        // Update charts with real data
+        function updateCharts(data) {
+            if (data.cpu && data.memory && data.disk) {
+                // Update distribution chart
+                const cpuUsage = data.cpu.usage_percent || 0;
+                const memoryUsage = data.memory.usage_percent || 0;
+                const diskUsage = data.disk.total_usage_percent || 0;
+                const available = 100 - Math.max(cpuUsage, memoryUsage, diskUsage);
+
+                distributionChart.data.datasets[0].data = [cpuUsage, memoryUsage, diskUsage, available];
+                distributionChart.update();
+
+                // Update trends chart
+                const networkUsage = data.network ? 
+                    (data.network.sent_rate_kbps + data.network.recv_rate_kbps) / 10 : 0; // Scale down for display
+
+                trendsChart.data.datasets[0].data = [cpuUsage, memoryUsage, diskUsage, Math.min(networkUsage, 100)];
+                trendsChart.update();
+            }
+        }
+
+        // Update process table
+        function updateProcessTable(processes) {
+            const tbody = document.getElementById('processTable');
+            
+            if (!processes || processes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No process data available</td></tr>';
+                return;
+            }
+
+            // Sort by CPU usage and take top 10
+            const topProcesses = processes
+                .sort((a, b) => (b.cpu_percent || 0) - (a.cpu_percent || 0))
+                .slice(0, 10);
+
+            tbody.innerHTML = topProcesses.map(proc => `
+                <tr>
+                    <td>${proc.name || 'Unknown'}</td>
+                    <td>${proc.pid || '--'}</td>
+                    <td>${(proc.cpu_percent || 0).toFixed(1)}%</td>
+                    <td>${(proc.memory_percent || 0).toFixed(1)}%</td>
+                    <td>
+                        <span class="badge ${proc.status === 'running' ? 'bg-success' : 'bg-secondary'}">
+                            ${proc.status || 'unknown'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            loadAnalytics();
+            
+            // Refresh data every 30 seconds
+            setInterval(loadAnalytics, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }} - Historical Data</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-tachometer-alt"></i> {{ app_name }}
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a class="nav-link active" href="{{ url_for('history') }}">History</a>
+                <a class="nav-link" href="{{ url_for('analytics') }}">Analytics</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2><i class="fas fa-history"></i> Historical Data</h2>
+                <p class="text-muted">View system performance trends over time</p>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="timeRange" class="form-label">Time Range</label>
+                <select class="form-select" id="timeRange">
+                    <option value="1">Last 1 hour</option>
+                    <option value="6">Last 6 hours</option>
+                    <option value="24" selected>Last 24 hours</option>
+                    <option value="168">Last 7 days</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="metricType" class="form-label">Metric Type</label>
+                <select class="form-select" id="metricType">
+                    <option value="cpu" selected>CPU Usage</option>
+                    <option value="memory">Memory Usage</option>
+                    <option value="disk">Disk Usage</option>
+                    <option value="network">Network Usage</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-line"></i> Historical Trend
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="historyChart" height="400"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Statistics</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="border-end">
+                                    <h4 class="text-primary" id="avgValue">--</h4>
+                                    <small class="text-muted">Average</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border-end">
+                                    <h4 class="text-success" id="minValue">--</h4>
+                                    <small class="text-muted">Minimum</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <h4 class="text-danger" id="maxValue">--</h4>
+                                <small class="text-muted">Maximum</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Data Points</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-1">Total Records: <span id="totalRecords" class="fw-bold">--</span></p>
+                        <p class="mb-1">Time Span: <span id="timeSpan" class="fw-bold">--</span></p>
+                        <p class="mb-0">Last Updated: <span id="lastUpdated" class="fw-bold">--</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let historyChart;
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            historyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Usage (%)',
+                        data: [],
+                        borderColor: '#1976d2',
+                        backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                displayFormats: {
+                                    hour: 'HH:mm',
+                                    day: 'MMM DD'
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load historical data
+        async function loadHistoricalData() {
+            const timeRange = document.getElementById('timeRange').value;
+            const metricType = document.getElementById('metricType').value;
+
+            try {
+                const response = await fetch(`/api/v1/data/historical`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        start_date: new Date(Date.now() - timeRange * 60 * 60 * 1000).toISOString(),
+                        end_date: new Date().toISOString(),
+                        granularity: timeRange > 24 ? '1hour' : '5min'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    updateChart(data.data[metricType] || []);
+                    updateStats(data.data[metricType] || []);
+                } else {
+                    console.error('Failed to load historical data');
+                }
+            } catch (error) {
+                console.error('Error loading historical data:', error);
+            }
+        }
+
+        // Update chart with new data
+        function updateChart(data) {
+            const labels = data.map(item => new Date(item.timestamp));
+            const values = data.map(item => item.usage_percent || 0);
+
+            historyChart.data.labels = labels;
+            historyChart.data.datasets[0].data = values;
+            historyChart.update();
+        }
+
+        // Update statistics
+        function updateStats(data) {
+            if (data.length === 0) {
+                document.getElementById('avgValue').textContent = '--';
+                document.getElementById('minValue').textContent = '--';
+                document.getElementById('maxValue').textContent = '--';
+                document.getElementById('totalRecords').textContent = '0';
+                document.getElementById('timeSpan').textContent = '--';
+                document.getElementById('lastUpdated').textContent = '--';
+                return;
+            }
+
+            const values = data.map(item => item.usage_percent || 0);
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+
+            document.getElementById('avgValue').textContent = avg.toFixed(1) + '%';
+            document.getElementById('minValue').textContent = min.toFixed(1) + '%';
+            document.getElementById('maxValue').textContent = max.toFixed(1) + '%';
+            document.getElementById('totalRecords').textContent = data.length;
+            
+            if (data.length > 0) {
+                const firstTime = new Date(data[0].timestamp);
+                const lastTime = new Date(data[data.length - 1].timestamp);
+                const span = Math.round((lastTime - firstTime) / (1000 * 60 * 60));
+                document.getElementById('timeSpan').textContent = span + ' hours';
+                document.getElementById('lastUpdated').textContent = lastTime.toLocaleString();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('timeRange').addEventListener('change', loadHistoricalData);
+        document.getElementById('metricType').addEventListener('change', loadHistoricalData);
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            loadHistoricalData();
+        });
+    </script>
+</body>
+</html>

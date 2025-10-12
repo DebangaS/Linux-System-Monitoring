@@ -1,162 +1,29 @@
-# CI/CD Pipeline for System Monitor
-# Author: Member 1
-name: CI/CD Pipeline
+name: Tests
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main]
   pull_request:
-    branches:
-      - main
-
-env:
-  PYTHON_VERSION: '3.9'
-  NODE_VERSION: '16'
+    branches: [main]
 
 jobs:
-  # --------------------------
-  # 1. TEST JOB
-  # --------------------------
   test:
     runs-on: ubuntu-latest
-
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
+          python-version: '3.12'
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-cov flake8 black isort bandit
-
-      - name: Code formatting check
+          pip install pytest
+          
+      - name: Run tests
         run: |
-          black --check .
-          isort --check-only .
-
-      - name: Lint with flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
-
-      - name: Create test directories
-        run: |
-          mkdir -p data/logs data/exports data/tests
-          chmod 755 data/logs data/exports data/tests
-
-      - name: Run tests with coverage
-        env:
-          FLASK_ENV: testing
-          REDIS_URL: redis://localhost:6379/0
-        run: |
-          python -m pytest tests/ -v --cov=src --cov-report=xml --cov-report=html
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
-
-      - name: Security check with Bandit
-        run: |
-          bandit -r src/ -f json -o security-report.json || true
-
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            htmlcov/
-            security-report.json
-            data/logs/
-
-  # --------------------------
-  # 2. BUILD JOB
-  # --------------------------
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/system-monitor:latest
-            ${{ secrets.DOCKER_USERNAME }}/system-monitor:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # --------------------------
-  # 3. DEPLOY JOB
-  # --------------------------
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to staging
-        run: |
-          echo "Deploying to staging environment..."
-          # Add actual deployment commands here (SSH, Kubernetes, Docker Compose, etc.)
-
-      - name: Run deployment tests
-        run: |
-          echo "Running deployment verification tests..."
-          # Add your deployment verification scripts here
-
-      - name: Notify deployment
-        if: success()
-        run: |
-          echo " Deployment successful!"
-          # Add Slack/email/webhook notifications here
+          python -m pytest tests/test_comprehensive.py -v

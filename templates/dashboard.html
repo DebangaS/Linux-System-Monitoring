@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ app_name }} - Advanced Dashboard</title>
+
+  <!-- CSS Libraries -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/gridstack@9.2.0/dist/gridstack.min.css" rel="stylesheet">
+  
+  <style>
+    body { padding-top: 70px; }
+    .dashboard-container { display: flex; height: calc(100vh - 70px); }
+    .sidebar { width: 250px; background: #f8f9fa; border-right: 1px solid #dee2e6; padding: 1rem; }
+    .dashboard-main { flex: 1; padding: 1rem; overflow: auto; }
+    .widget-card { background: white; border: 1px solid #dee2e6; border-radius: 8px; height: 100%; }
+    .widget-header { padding: 0.75rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; }
+    .widget-content { padding: 1rem; height: calc(100% - 60px); }
+    .stat-item { display: flex; align-items: center; padding: 0.5rem 0; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem; }
+    .stat-icon.cpu { background: #e3f2fd; color: #1976d2; }
+    .stat-icon.memory { background: #f3e5f5; color: #7b1fa2; }
+    .stat-icon.disk { background: #e8f5e8; color: #388e3c; }
+    .stat-icon.network { background: #fff3e0; color: #f57c00; }
+    .stat-value { font-weight: bold; font-size: 1.1em; }
+    .stat-label { font-size: 0.9em; color: #666; }
+  </style>
+
+  <!-- JS Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.0/dist/gridstack-all.js"></script>
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{{ url_for('index') }}"><i class="fas fa-tachometer-alt"></i> {{ app_name }}</a>
+
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+        <a class="nav-link active" href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a class="nav-link" href="{{ url_for('history') }}">History</a>
+        <a class="nav-link" href="{{ url_for('analytics') }}">Analytics</a>
+      </div>
+
+      <div class="d-flex gap-2 ms-3">
+        <button class="btn btn-outline-light btn-sm" id="addWidgetBtn">
+          <i class="fas fa-plus"></i> Add Widget
+        </button>
+        <button class="btn btn-outline-light btn-sm" id="saveLayoutBtn">
+          <i class="fas fa-save"></i> Save Layout
+        </button>
+        <button class="btn btn-outline-light btn-sm" id="resetLayoutBtn">
+          <i class="fas fa-undo"></i> Reset
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sidebar + Main Content -->
+  <div class="dashboard-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h6>Quick Stats</h6>
+      </div>
+      <div class="quick-stats">
+        <div class="stat-item">
+          <div class="stat-icon cpu"><i class="fas fa-microchip"></i></div>
+          <div class="stat-details">
+            <div class="stat-label">CPU Usage</div>
+            <div class="stat-value" id="cpuUsage">--%</div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-icon memory"><i class="fas fa-memory"></i></div>
+          <div class="stat-details">
+            <div class="stat-label">Memory</div>
+            <div class="stat-value" id="memoryUsage">--%</div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-icon disk"><i class="fas fa-hdd"></i></div>
+          <div class="stat-details">
+            <div class="stat-label">Disk Usage</div>
+            <div class="stat-value" id="diskUsage">--%</div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-icon network"><i class="fas fa-network-wired"></i></div>
+          <div class="stat-details">
+            <div class="stat-label">Network</div>
+            <div class="stat-value" id="networkUsage">--%</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="dashboard-main">
+      <div class="grid-stack">
+        <!-- CPU Usage Widget -->
+        <div class="grid-stack-item" gs-w="6" gs-h="3">
+          <div class="grid-stack-item-content widget-card">
+            <div class="widget-header">
+              <h6><i class="fas fa-microchip"></i> CPU Usage</h6>
+              <div class="widget-controls">
+                <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i></button>
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div class="widget-content">
+              <canvas id="cpuChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Memory Usage Widget -->
+        <div class="grid-stack-item" gs-w="6" gs-h="3">
+          <div class="grid-stack-item-content widget-card">
+            <div class="widget-header">
+              <h6><i class="fas fa-memory"></i> Memory Usage</h6>
+              <div class="widget-controls">
+                <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i></button>
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div class="widget-content">
+              <canvas id="memoryChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Network Usage Widget -->
+        <div class="grid-stack-item" gs-w="12" gs-h="3">
+          <div class="grid-stack-item-content widget-card">
+            <div class="widget-header">
+              <h6><i class="fas fa-network-wired"></i> Network Usage</h6>
+              <div class="widget-controls">
+                <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync"></i></button>
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div class="widget-content">
+              <canvas id="networkChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- JS Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Initialize GridStack
+    let grid = GridStack.init();
+    
+    // Socket.IO connection
+    const socket = io();
+    
+    // Chart configurations
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100
+        }
+      }
+    };
+
+    // Initialize charts
+    const cpuChart = new Chart(document.getElementById('cpuChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'CPU Usage (%)',
+          data: [],
+          borderColor: '#1976d2',
+          backgroundColor: 'rgba(25, 118, 210, 0.1)',
+          tension: 0.4
+        }]
+      },
+      options: chartOptions
+    });
+
+    const memoryChart = new Chart(document.getElementById('memoryChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Memory Usage (%)',
+          data: [],
+          borderColor: '#7b1fa2',
+          backgroundColor: 'rgba(123, 31, 162, 0.1)',
+          tension: 0.4
+        }]
+      },
+      options: chartOptions
+    });
+
+    const networkChart = new Chart(document.getElementById('networkChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Network In (KB/s)',
+          data: [],
+          borderColor: '#f57c00',
+          backgroundColor: 'rgba(245, 124, 0, 0.1)',
+          tension: 0.4
+        }, {
+          label: 'Network Out (KB/s)',
+          data: [],
+          borderColor: '#388e3c',
+          backgroundColor: 'rgba(56, 142, 60, 0.1)',
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    // Socket event handlers
+    socket.on('connect', function() {
+      console.log('Connected to server');
+    });
+
+    socket.on('system_update', function(data) {
+      const now = new Date().toLocaleTimeString();
+      
+      // Update quick stats
+      if (data.cpu) {
+        document.getElementById('cpuUsage').textContent = data.cpu.usage_percent + '%';
+        updateChart(cpuChart, now, data.cpu.usage_percent);
+      }
+      
+      if (data.memory) {
+        document.getElementById('memoryUsage').textContent = data.memory.usage_percent + '%';
+        updateChart(memoryChart, now, data.memory.usage_percent);
+      }
+      
+      if (data.disk) {
+        document.getElementById('diskUsage').textContent = data.disk.total_usage_percent + '%';
+      }
+      
+      if (data.network) {
+        document.getElementById('networkUsage').textContent = 
+          (data.network.sent_rate_kbps + data.network.recv_rate_kbps).toFixed(1) + ' KB/s';
+        updateNetworkChart(networkChart, now, data.network.recv_rate_kbps, data.network.sent_rate_kbps);
+      }
+    });
+
+    function updateChart(chart, label, value) {
+      chart.data.labels.push(label);
+      chart.data.datasets[0].data.push(value);
+      
+      // Keep only last 20 data points
+      if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+      
+      chart.update('none');
+    }
+
+    function updateNetworkChart(chart, label, inValue, outValue) {
+      chart.data.labels.push(label);
+      chart.data.datasets[0].data.push(inValue);
+      chart.data.datasets[1].data.push(outValue);
+      
+      // Keep only last 20 data points
+      if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[1].data.shift();
+      }
+      
+      chart.update('none');
+    }
+
+    // Widget controls
+    document.getElementById('addWidgetBtn').addEventListener('click', function() {
+      // Add widget functionality
+      alert('Add Widget functionality - to be implemented');
+    });
+
+    document.getElementById('saveLayoutBtn').addEventListener('click', function() {
+      // Save layout functionality
+      alert('Layout saved!');
+    });
+
+    document.getElementById('resetLayoutBtn').addEventListener('click', function() {
+      // Reset layout functionality
+      if (confirm('Reset dashboard layout?')) {
+        location.reload();
+      }
+    });
+  </script>
+</body>
+</html>
