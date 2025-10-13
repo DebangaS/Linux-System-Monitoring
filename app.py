@@ -82,7 +82,7 @@ def create_app(config_name: str | None = None):
         # In tests, ensure a Socket.IO-capable server is running regardless of external fixture.
             try:
                 def _run_socketio():
-                    socketio.run(app, host='127.0.0.1', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+                    socketio.run(app, host='0.0.0.0', port=5001, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
                 t = threading.Thread(target=_run_socketio, daemon=True)
                 t.start()
                 time.sleep(0.5)
@@ -404,5 +404,5 @@ def register_socketio_events(socketio, app):
 if __name__ == '__main__':
     app, socketio = create_app()
     debug_mode = app.config.get('DEBUG', True)
-    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=8080)
 
