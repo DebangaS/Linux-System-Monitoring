@@ -227,6 +227,25 @@ class DatabaseManager:
         except sqlite3.Error:
             return False
 
+    def store_system_info(self, info: dict):
+        """
+        Store a single record in the system_info table.
+        Expected keys in info: hostname, platform
+        """
+        timestamp = utcnow_iso()
+        hostname = info.get('hostname', 'unknown')
+        platform = info.get('platform', 'unknown')
+        try:
+            with self.get_connection() as conn:
+                conn.execute(
+                    "INSERT INTO system_info (timestamp, hostname, platform) VALUES (?, ?, ?)",
+                    (timestamp, hostname, platform)
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store system info: {e}")
+            return False
+
     def get_historical_metrics(self, metric_type: str, hours: int = 1):
         # ... (method unchanged)
         since_time = datetime.now(timezone.utc) - timedelta(hours=hours)
